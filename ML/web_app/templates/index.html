@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediksi Harga Rumah Jabodetabek</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Prediksi Harga Rumah</h1>
+            <p>Jabodetabek Area - Machine Learning Model</p>
+        </header>
+
+        <main>
+            <div class="form-section">
+                <h2>Masukkan Data Rumah</h2>
+                
+                <form id="prediction-form">
+                    <div class="form-group">
+                        <label for="kota">Kota</label>
+                        <select id="kota" name="kota" required>
+                            <option value="">Pilih Kota</option>
+                            {% for city in cities %}
+                            <option value="{{ city }}">{{ city }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="kecamatan">Kecamatan</label>
+                        <select id="kecamatan" name="kecamatan" required disabled>
+                            <option value="">Pilih Kecamatan</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="luas_tanah">Luas Tanah (m²)</label>
+                            <input type="number" id="luas_tanah" name="luas_tanah" min="1" step="0.1" required placeholder="Contoh: 100">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="luas_bangunan">Luas Bangunan (m²)</label>
+                            <input type="number" id="luas_bangunan" name="luas_bangunan" min="1" step="0.1" required placeholder="Contoh: 120">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kamar_tidur">Kamar Tidur</label>
+                            <input type="number" id="kamar_tidur" name="kamar_tidur" min="0" required placeholder="Contoh: 3">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="kamar_mandi">Kamar Mandi</label>
+                            <input type="number" id="kamar_mandi" name="kamar_mandi" min="0" required placeholder="Contoh: 2">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-predict">Prediksi Harga</button>
+                </form>
+            </div>
+
+            <div class="result-section" id="result-section" style="display: none;">
+                <h2>Hasil Prediksi</h2>
+                <div class="price-card">
+                    <div class="price-label">Harga Rumah Diperkirakan</div>
+                    <div class="price-value" id="harga-prediksi">-</div>
+                    <div class="price-location" id="lokasi-rumah">-</div>
+                    <div class="price-note" id="min-price-note" style="display: none; margin-top: 10px; padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; font-size: 12px; color: #856404;">
+                        * Prediksi mencapai harga minimum untuk area ini
+                    </div>
+                </div>
+                
+                <div class="detail-card">
+                    <h3>Detail Rumah</h3>
+                    <table class="detail-table">
+                        <tr>
+                            <td>Lokasi</td>
+                            <td id="detail-lokasi">-</td>
+                        </tr>
+                        <tr>
+                            <td>Luas Tanah</td>
+                            <td id="detail-tanah">-</td>
+                        </tr>
+                        <tr>
+                            <td>Luas Bangunan</td>
+                            <td id="detail-bangunan">-</td>
+                        </tr>
+                        <tr>
+                            <td>Kamar Tidur</td>
+                            <td id="detail-tidur">-</td>
+                        </tr>
+                        <tr>
+                            <td>Kamar Mandi</td>
+                            <td id="detail-mandi">-</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <button type="button" class="btn-reset" onclick="resetForm()">Prediksi Lagi</button>
+            </div>
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Menghitung prediksi...</p>
+            </div>
+        </main>
+
+        <footer>
+            <p>Model: Linear Regression | R² Score: 0.6828 | Dataset: 3,514 rumah Jabodetabek</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

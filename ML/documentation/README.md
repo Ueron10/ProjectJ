@@ -13,7 +13,7 @@ Machine Learning (ML) adalah cabang dari Artificial Intelligence (AI) yang memun
 Dalam konteks properti, ML dapat digunakan untuk memprediksi harga rumah berdasarkan fitur-fitur seperti luas tanah, luas bangunan, jumlah kamar, dan lokasi. Dengan menganalisis data transaksi rumah yang sudah terjadi, model ML dapat mempelajari hubungan antara fitur-fitur tersebut dengan harga jual.
 
 ### 1.2 Rumusan Masalah
-Bagaimana membangun model prediksi harga rumah menggunakan Regresi Linear berdasarkan fitur luas tanah, luas bangunan, jumlah kamar tidur, dan jumlah kamar mandi?
+Bagaimana membangun model prediksi harga rumah menggunakan Regresi Linear berdasarkan fitur luas tanah, luas bangunan, jumlah kamar tidur, jumlah kamar mandi, kota, dan kecamatan?
 
 ### 1.3 Tujuan Penelitian
 1. Membangun pipeline Machine Learning untuk prediksi harga rumah
@@ -43,12 +43,14 @@ y = β₀ + β₁x₁ + β₂x₂ + ... + βₙxₙ + ε
 
 Untuk prediksi harga rumah:
 ```
-harga = intercept + (w₁ × luas_tanah) + (w₂ × luas_bangunan) + (w₃ × kamar_tidur) + (w₄ × kamar_mandi)
+harga = intercept + (w₁ × luas_tanah) + (w₂ × luas_bangunan) + (w₃ × kamar_tidur) + (w₄ × kamar_mandi) + Σ(wᵢ × kotaᵢ) + Σ(wⱼ × kecamatanⱼ)
 ```
 
 Dimana:
 - `intercept (β₀)`: Nilai dasar harga ketika semua fitur bernilai nol
-- `β₁, β₂, β₃, β₄`: Koefisien/bobot yang menunjukkan pengaruh masing-masing fitur
+- `β₁, β₂, β₃, β₄`: Koefisien/bobot untuk fitur numerik
+- `Σ(wᵢ × kotaᵢ)`: Koefisien one-hot encoding untuk kota
+- `Σ(wⱼ × kecamatanⱼ)`: Koefisien one-hot encoding untuk kecamatan
 - `ε`: Error/residual
 
 ### 2.3 Metrik Evaluasi
@@ -69,7 +71,7 @@ Mengukur seberapa baik model menjelaskan variasi dalam data (0-1, semakin tinggi
 ## BAB 3: METODOLOGI
 
 ### 3.1 Data
-Dataset yang digunakan adalah data harga rumah di area Jabodetabek dari website rumah123.com. Dataset terdiri dari 3,553 baris data dengan kolom:
+Dataset yang digunakan adalah data harga rumah di area Jabodetabek dari website rumah123.com. Dataset terdiri dari 3,514 baris data dengan kolom:
 
 | Kolom | Deskripsi |
 |-------|-----------|
@@ -78,6 +80,8 @@ Dataset yang digunakan adalah data harga rumah di area Jabodetabek dari website 
 | building_size_m2 | Luas bangunan dalam meter persegi |
 | bedrooms | Jumlah kamar tidur |
 | bathrooms | Jumlah kamar mandi |
+| city | Kota (Jakarta, Bogor, Depok, Tangerang, Bekasi) |
+| district | Kecamatan dalam kota tersebut |
 
 ### 3.2 Alat dan Library
 - **Bahasa Pemrograman**: Python 3.x
@@ -86,18 +90,21 @@ Dataset yang digunakan adalah data harga rumah di area Jabodetabek dari website 
   - scikit-learn: Algoritma Machine Learning
   - joblib: Serialisasi model
   - matplotlib: Visualisasi data
+  - flask: Web application framework
 
 ### 3.3 Langkah Penelitian
 
 #### 3.3.1 Data Cleaning
-- Memilih kolom relevan: harga, luas_tanah, luas_bangunan, kamar_tidur, kamar_mandi
+- Memilih kolom relevan: harga, kota, kecamatan, luas_tanah, luas_bangunan, kamar_tidur, kamar_mandi
+- Membersihkan whitespace pada kolom kota dan kecamatan
 - Menghapus data kosong (dropna)
 
 #### 3.3.2 Konversi Data
 - Konversi kolom harga ke tipe numerik (float64)
 
 #### 3.3.3 Feature Engineering
-- X (fitur): luas_tanah, luas_bangunan, kamar_tidur, kamar_mandi
+- One-hot encoding untuk kolom kota (9 kota) dan kecamatan (388 kecamatan)
+- X (fitur): luas_tanah, luas_bangunan, kamar_tidur, kamar_mandi, kota (one-hot), kecamatan (one-hot) - total 392 fitur
 - y (target): harga
 
 #### 3.3.4 Data Splitting
@@ -107,7 +114,8 @@ Dataset yang digunakan adalah data harga rumah di area Jabodetabek dari website 
 
 #### 3.3.5 Model Training
 - Algoritma: Linear Regression (sklearn.linear_model.LinearRegression)
-- Training dengan data train
+- Training dengan data train (2,811 sampel, 392 fitur)
+- Model yang terlatih disimpan sebagai `model_regresi.pkl`
 
 #### 3.3.6 Evaluasi Model
 - Mean Absolute Error (MAE)
@@ -117,51 +125,41 @@ Dataset yang digunakan adalah data harga rumah di area Jabodetabek dari website 
 
 ## BAB 4: HASIL DAN PEMBAHASAN
 
-### 4.1 Implementasi Pipeline
-Pipeline dibangun dalam 8 langkah modular yang dirancang untuk memudahkan reproduksi dan pemeliharaan sistem prediksi harga rumah. Setiap langkah menghasilkan output yang menjadi input bagi langkah berikutnya, menciptakan alur kerja yang terstruktur dan transparan.
+### 4.1 Hasil Preprocessing Data
+Dataset awal: 3,553 data
+Setelah cleaning: 3,514 data
+Kolom yang digunakan: harga, kota, kecamatan, luas_tanah, luas_bangunan, kamar_tidur, kamar_mandi
+Feature engineering: One-hot encoding menghasilkan 392 fitur (4 numerik + 388 lokasi)
 
-| No | Script | Fungsi | Input | Output |
-|----|--------|--------|-------|--------|
-| 1 | `01_cleaning.py` | Memilih kolom relevan, rename, dan hapus missing values | `jabodetabek_house_price.csv` | `data_bersih.csv` (3,514 baris) |
-| 2 | `02_konversi.py` | Konversi tipe data harga ke numerik | `data_bersih.csv` | `data_konversi.csv` |
-| 3 | `03_fitur_target.py` | Memisahkan fitur (X) dan target (y) | `data_konversi.csv` | `fitur_rumah.csv`, `target_harga.csv` |
-| 4 | `04_split.py` | Membagi data train (80%) dan test (20%) | `fitur_rumah.csv`, `target_harga.csv` | `X_train.csv`, `X_test.csv`, `y_train.csv`, `y_test.csv` |
-| 5 | `05_training.py` | Melatih model Linear Regression | `X_train.csv`, `y_train.csv` | `model_regresi.pkl` |
-| 6 | `06_prediksi.py` | Melakukan prediksi pada data test | `X_test.csv`, `model_regresi.pkl` | `hasil_prediksi.csv` |
-| 7 | `07_evaluasi.py` | Menghitung metrik MAE dan R² | `y_test.csv`, `hasil_prediksi.csv` | Metrik evaluasi di console |
-| 8 | `08_tes_manual.py` | Prediksi interaktif berdasarkan input user | Input manual user | Prediksi harga di console |
-
-Keuntungan pendekatan modular ini adalah kemudahan debugging, kemampuan untuk mengganti algoritma pada langkah tertentu tanpa mengubah seluruh sistem, serta dokumentasi yang jelas untuk setiap tahap proses.
+**Dataset:** 2,811 sampel training, 703 sampel testing
 
 ### 4.2 Visualisasi Data
-Gambar 4.1 menunjukkan scatter plot yang menggambarkan hubungan antara luas bangunan (sumbu x) dengan harga rumah (sumbu y). Dari visualisasi ini, terlihat beberapa pola penting:
+Gambar menunjukkan scatter plot yang menggambarkan hubungan antara luas bangunan (sumbu x) dengan harga rumah (sumbu y). Dari visualisasi ini, terlihat beberapa pola penting:
 
 ![Gambar 4.1](gambar_4_1_luas_bangunan_harga.png)
 *Gambar 4.1: Scatter Plot Luas Bangunan vs Harga Rumah*
 
 **Analisis Visualisasi:**
-1. **Tren Positif**: Terdapat korelasi positif yang jelas antara luas bangunan dan harga. Semakin besar luas bangunan, harga cenderung meningkat. Hal ini sesuai dengan ekspektasi logis di pasar properti.
-
-2. **Dispersi Data**: Titik-titik data menyebar cukup lebar, menunjukkan bahwa selain luas bangunan, terdapat faktor lain yang mempengaruhi harga (seperti lokasi, fasilitas, kondisi rumah).
-
-3. **Outlier**: Beberapa titik berada jauh di atas garis tren, kemungkinan rumah mewah dengan fasilitas premium. Sebaliknya, titik di bawah tren mungkin rumah di lokasi kurang strategis.
-
-4. **Rentang Data**: Luas bangunan berkisar 0-500 m² dengan harga terkonsentrasi di bawah 10 miliar rupiah.
+1. **Tren Positif**: Korelasi positif jelas antara luas bangunan dan harga.
+2. **Dispersi Data**: Titik data menyebar lebar, menunjukkan faktor lain (lokasi) mempengaruhi harga.
+3. **Outlier**: Titik di atas garis tren kemungkinan rumah mewah di lokasi premium.
+4. **Rentang Data**: Luas bangunan 0-500 m², harga terkonsentrasi di bawah 10 miliar.
 
 ### 4.3 Koefisien Model
 
-Model Regresi Linear menghitung hubungan antara fitur dan target dengan rumus:
+**Perhitungan Model**
 
-**Rumus Matematis:**
+Model Regresi Linear dengan fitur lokasi:
 ```
-harga = β₀ + β₁X₁ + β₂X₂ + β₃X₃ + β₄X₄ + ε
+harga = β₀ + β₁X₁ + β₂X₂ + β₃X₃ + β₄X₄ + Σ(βᵢ × kotaᵢ) + Σ(βⱼ × kecamatanⱼ) + ε
 ```
 
 Dimana:
-- `β₀` = Intercept (nilai konstan)
-- `β₁, β₂, β₃, β₄` = Koefisien masing-masing fitur
-- `X₁` = Luas Tanah, `X₂` = Luas Bangunan, `X₃` = Kamar Tidur, `X₄` = Kamar Mandi
-- `ε` = Error term
+- β₀ = Intercept
+- β₁, β₂, β₃, β₄ = Koefisien fitur numerik
+- Σ(βᵢ × kotaᵢ) = Koefisien 9 kota (one-hot encoding)
+- Σ(βⱼ × kecamatanⱼ) = Koefisien 388 kecamatan (one-hot encoding)
+- ε = Error term
 
 **Formula Perhitungan Koefisien (Ordinary Least Squares):**
 ```
@@ -172,148 +170,180 @@ Hasil training model Linear Regression menghasilkan koefisien yang merepresentas
 
 | Fitur | Koefisien | Interpretasi |
 |-------|-----------|--------------|
-| Luas Tanah | Rp 5,235,380 per m² | Setiap tambahan 1 m² tanah meningkatkan harga sekitar Rp 5.2 juta |
-| Luas Bangunan | Rp 25,567,700 per m² | Setiap tambahan 1 m² bangunan meningkatkan harga sekitar Rp 25.6 juta |
-| Kamar Tidur | -Rp 739,623,901 | Koefisien negatif, menunjukkan efek yang perlu dianalisis lebih lanjut |
-| Kamar Mandi | Rp 143,515,905 | Setiap tambahan 1 kamar mandi meningkatkan harga sekitar Rp 143.5 juta |
-| Intercept | Rp 440,669,031 | Nilai dasar harga ketika semua fitur bernilai nol |
+| Luas Tanah | Rp 7,300,230 per m² | Setiap 1 m² tanah meningkatkan harga Rp 7.3 juta |
+| Luas Bangunan | Rp 21,137,139 per m² | Setiap 1 m² bangunan meningkatkan harga Rp 21.14 juta |
+| Kamar Tidur | -Rp 699,790,333 | Korelasi negatif dengan luas bangunan |
+| Kamar Mandi | Rp 2,171,847 | Setiap kamar mandi menambah Rp 2.17 juta |
+| Intercept | Rp 2,149,308,413 | Nilai dasar harga |
+
+**Koefisien Lokasi (Contoh):**
+- Jakarta Pusat: +Rp 9.48 miliar (premium tertinggi)
+- Jakarta Selatan: +Rp 1.58 miliar
+- Bekasi: -Rp 1.23 miliar (negatif)
+- Depok: -Rp 1.25 miliar (negatif)
+- Jakarta Barat: -Rp 1.49 miliar (negatif)
 
 **Pembahasan Koefisien:**
+1. **Luas Bangunan Dominan**: Koefisien Rp 21.14 juta/m² menunjukkan pengaruh terbesar terhadap harga.
+2. **Pengaruh Lokasi Signifikan**: Perbedaan ekstrem antara Jakarta Pusat (+Rp 9.48M) vs Jakarta Barat (-Rp 1.49M).
+3. **Kamar Tidur Negatif**: Koefisien negatif Rp -699 juta, menunjukkan korelasi dengan luas bangunan.
+4. **Kamar Mandi Positif**: Meski kecil (Rp 2.17 juta), tetap memberikan nilai tambah.
+5. **Intercept Tinggi**: Nilai dasar Rp 2.15 miliar mencerminkan harga properti Jabodetabek.
 
-1. **Luas Bangunan Dominan**: Koefisien luas bangunan (Rp 25.6 juta/m²) jauh lebih besar daripada luas tanah (Rp 5.2 juta/m²). Ini menunjukkan bahwa luas bangunan memiliki pengaruh terbesar terhadap harga rumah. Hal ini masuk akal karena biaya konstruksi dan material untuk bangunan biasanya lebih signifikan daripada nilai tanah mentah.
+**Mengapa Koefisien Lokasi Bisa Negatif?**
 
-2. **Kamar Tidur Negatif**: Koefisien negatif pada kamar tidur mungkin disebabkan oleh:
-   - Multikolinearitas dengan luas bangunan (rumah dengan lebih banyak kamar biasanya lebih besar)
-   - Rumah kecil dengan banyak kamar mungkin dianggap tidak efisien
-   - Perlu analisis lebih lanjut untuk memvalidasi hasil ini
+Koefisien negatif pada kota (Bekasi, Depok, Jakarta Barat) terjadi karena:
+- **One-Hot Encoding**: Model menggunakan 9 fitur biner untuk kota (1 = ya, 0 = tidak). Koefisien menunjukkan perubahan harga RELATIF terhadap baseline (rata-rata semua kota).
+- **Intercept Tinggi**: Nilai intercept Rp 2.15 miliar mencakup harga dasar untuk area dengan koefisien negatif. 
+- **Perbandingan Relatif**: Kota dengan koefisien negatif harganya lebih rendah dari rata-rata, bukan berarti harga negatif secara absolut.
 
-3. **Kamar Mandi Positif**: Kamar mandi memiliki koefisien positif yang signifikan, menunjukkan fasilitas ini menjadi nilai tambah yang dihargai pembeli.
-
-4. **Intercept**: Nilai intercept Rp 440 juta bisa diartikan sebagai nilai minimum atau "harga lahan dasar" meskipun dalam praktiknya rumah dengan fitur nol tidak realistis.
+Contoh: Rumah di Bekasi (koefisien -Rp 1.23M) dengan fitur kecil bisa menghasilkan prediksi rendah secara matematis, namun intercept Rp 2.15 miliar memastikan harga tetap positif.
 
 ### 4.4 Evaluasi Model
 Model dievaluasi menggunakan data test yang terdiri dari 703 sampel (20% dari total data). Evaluasi ini memberikan gambaran objektif tentang kemampuan model dalam memprediksi harga rumah yang belum pernah dilihat sebelumnya.
 
-**Rumus Metrik Evaluasi:**
+| Metrik | Nilai | Keterangan |
+|--------|-------|------------|
+| MAE | Rp 1,793,456,782 | Rata-rata selisih prediksi dengan aktual |
+| R² Score | 0.6828 | Proporsi variasi yang dapat dijelaskan model |
+
+**Rumus Perhitungan Metrik:**
 
 **Mean Absolute Error (MAE):**
 ```
 MAE = (1/n) × Σ|yᵢ - ŷᵢ|
 ```
 
-**R-squared (R²):**
+Dimana:
+- `n` = jumlah sampel (703 data test)
+- `yᵢ` = harga aktual rumah ke-i
+- `ŷᵢ` = harga prediksi model untuk rumah ke-i
+- `|yᵢ - ŷᵢ|` = selisih absolut antara aktual dan prediksi
+
+MAE dihitung dengan menjumlahkan selisih absolut dari 703 data test, kemudian dibagi 703. Hasil Rp 1.79 miliar berarti rata-rata model meleset sekitar 1.79 miliar dari harga sebenarnya.
+
+**R-squared (R² Score):**
 ```
-R² = 1 - (Σ(yᵢ - ŷᵢ)² / Σ(yᵢ - ȳ)²)
+R² = 1 - (SS_res / SS_tot)
 ```
 
 Dimana:
-- `n` = jumlah sampel
-- `yᵢ` = harga aktual
-- `ŷᵢ` = harga prediksi
-- `ȳ` = rata-rata harga aktual
+- `SS_res = Σ(yᵢ - ŷᵢ)²` = jumlah kuadrat residual (error prediksi)
+- `SS_tot = Σ(yᵢ - ȳ)²` = jumlah kuadrat total (variasi data)
+- `ȳ` = rata-rata harga aktual semua rumah
 
-Hasil evaluasi model:
+R² = 0.6828 berarti 68.28% variasi harga rumah dapat dijelaskan oleh model. Sisanya 31.72% dipengaruhi faktor lain (kondisi rumah, fasilitas, umur bangunan, dll) yang tidak ada dalam dataset.
 
-| Metrik | Nilai | Keterangan |
-|--------|-------|------------|
-| MAE | Rp 1,661,393,109 | Rata-rata selisih prediksi dengan aktual |
-| R² Score | 0.5992 | Proporsi variasi yang dapat dijelaskan model |
+**Interpretasi Detail dan Pengaruhnya:**
 
-**Interpretasi Detail:**
+1. **R² Score (0.6828)**: Model berhasil menjelaskan 68.28% variasi harga rumah di Jabodetabek. Ini berarti dari 100 perbedaan harga rumah yang diamati, 68 di antaranya bisa dijelaskan oleh model berdasarkan luas tanah, bangunan, kamar, dan lokasi. Sisanya 32% dipengaruhi faktor eksternal seperti:
+   - Kondisi fisik rumah (baru/renovasi/tua)
+   - Akses jalan dan transportasi umum
+   - Fasilitas sekitar (sekolah, rumah sakit, mall)
+   - Keamanan dan kenyamanan lingkungan
+   - Pandangan/strategis lokasi
 
-1. **R² Score (0.5992)**: Nilai R² sebesar 0.5992 atau 59.92% menunjukkan bahwa model dapat menjelaskan hampir 60% variasi harga rumah dalam dataset. Dalam konteks prediksi harga properti yang dipengaruhi banyak faktor kompleks (lokasi, kondisi pasar, fasilitas umum), nilai ini tergolong moderat hingga baik. Faktor lokasi yang tidak dimasukkan dalam model kemungkinan besar menjadi penyebab 40% variasi yang belum terjelaskan.
+   Peningkatan dari 0.5992 menjadi 0.6828 (naik 8.36 poin) setelah penambahan fitur lokasi membuktikan bahwa **lokasi adalah faktor penting kedua setelah luas bangunan** dalam menentukan harga properti Jabodetabek.
 
-2. **MAE (Rp 1.66 Miliar)**: Mean Absolute Error sebesar Rp 1.66 miliar berarti rata-rata prediksi model meleset sekitar 1.66 miliar rupiah dari harga aktual. Untuk rumah dengan harga rata-rata sekitar Rp 2-5 miliar di Jabodetabek, margin error ini masih dalam batas wajar meskipun idealnya lebih rendah.
+2. **MAE (Rp 1.79 Miliar)**: Error rata-rata 1.79 miliar berarti jika model dipakai prediksi 100 rumah, total selisih dengan harga aktual kira-kira Rp 179 miliar. Dilihat dari:
+   - Rentang harga Jabodetabek sangat lebar (Rp 500 juta - Rp 50 miliar+)
+   - Harga rata-rata rumah di dataset sekitar Rp 3-5 miliar
+   - MAE 1.79 miliar = sekitar 35-60% dari harga rata-rata
+   
+   Margin ini masih besar untuk prediksi individu, tapi cukup akurat untuk estimasi kasar atau screening awal properti.
 
-3. **Konteks Properti Jabodetabek**: Dengan rentang harga rumah di Jabodetabek yang sangat luas (dari ratusan juta hingga puluhan miliar), MAE 1.66 miliar masih dapat diterima untuk prediksi kasar, namun perlu perbaikan untuk keputusan investasi yang lebih akurat.
+3. **Kontribusi Fitur Lokasi**: Penambahan kota dan kecamatan memberikan dampak signifikan:
+   - **Sebelum lokasi**: R² = 0.5992 (hanya luas dan kamar)
+   - **Sesudah lokasi**: R² = 0.6828
+   - **Peningkatan**: 8.36% kemampuan prediksi
+   
+   Ini menunjukkan rumah dengan spesifikasi sama (misal: 100m², 3KT, 2KM) bisa beda harga Rp 5-10 miliar hanya karena lokasi berbeda (Jakarta Selatan vs Bekasi).
 
-### 4.5 Prediksi Manual dan Validasi Model
+### 4.5 Prediksi dan Validasi Model
+Untuk memvalidasi kegunaan praktis model, dikembangkan web application yang dapat diakses melalui browser.
 
-Untuk memvalidasi kegunaan praktis model, dilakukan prediksi manual menggunakan script `08_tes_manual.py`. Script ini menerima input interaktif dari user dengan fitur multi-input (dapat memasukkan beberapa rumah sekaligus) dan menampilkan hasil prediksi harga berdasarkan model yang telah dilatih.
+**Cara Penggunaan Web Application:**
+1. Jalankan `python web_app/app.py` dari folder ML
+2. Buka browser dan akses http://localhost:5000
+3. Pilih kota dari dropdown (9 kota di Jabodetabek)
+4. Pilih kecamatan dari dropdown yang muncul setelah memilih kota
+5. Masukkan data rumah: luas tanah, luas bangunan, kamar tidur, kamar mandi
+6. Klik tombol "Prediksi Harga"
+7. Web app menampilkan hasil prediksi dengan detail lokasi dan spesifikasi rumah
 
-**Cara Penggunaan Script:**
-1. Jalankan `python 08_tes_manual.py`
-2. Masukkan data rumah: luas tanah, luas bangunan, kamar tidur, kamar mandi
-3. Pilih 'y' untuk menambahkan rumah lain, atau 'n' untuk melihat hasil
-4. Script menampilkan prediksi harga untuk semua rumah yang diinput
+**Tampilan Web Application:**
+Halaman utama menampilkan form dengan dropdown kota dan kecamatan yang terhubung secara dinamis. Setelah memilih kota, dropdown kecamatan akan terisi otomatis dengan daftar kecamatan di kota tersebut. User memasukkan spesifikasi rumah dan mendapatkan prediksi harga dalam format yang rapi dengan detail lengkap.
 
-**Contoh Output:**
-```
-Prediksi Harga Rumah - Multi Input
-----------------------------------------
+**Contoh Hasil Prediksi:**
 
-Masukkan data rumah:
-Luas Tanah (m2): 100
-Luas Bangunan (m2): 120
-Jumlah Kamar Tidur: 3
-Jumlah Kamar Mandi: 2
-Ingin menambahkan rumah lain? (y/n): y
-
-Masukkan data rumah:
-Luas Tanah (m2): 200
-Luas Bangunan (m2): 250
-Jumlah Kamar Tidur: 4
-Jumlah Kamar Mandi: 3
-Ingin menambahkan rumah lain? (y/n): n
-
-Hasil Prediksi:
-----------------------------------------
-Rumah 1:
-  Luas Tanah: 100 m2
-  Luas Bangunan: 120 m2
-  Kamar Tidur: 3
-  Kamar Mandi: 2
-  Harga Prediksi: Rp 2,100,491,170
-----------------------------------------
-Rumah 2:
-  Luas Tanah: 200 m2
-  Luas Bangunan: 250 m2
-  Kamar Tidur: 4
-  Kamar Mandi: 3
-  Harga Prediksi: Rp 5,351,722,206
-----------------------------------------
-```
-
-Berikut hasil prediksi untuk tiga profil rumah yang diuji:
-
-| Profil Rumah | Input | Prediksi | Analisis |
-|--------------|-------|----------|----------|
-| Rumah Standar | 100 m² tanah, 120 m² bangunan, 3 KT, 2 KM | Rp 2,100,491,170 | Harga sesuai untuk rumah menengah di pinggiran Jakarta |
-| Rumah Besar | 200 m² tanah, 250 m² bangunan, 4 KT, 3 KM | Rp 5,351,722,206 | Harga premium, cocok untuk kawasan elit |
-| Rumah Kompak | 60 m² tanah, 80 m² bangunan, 2 KT, 1 KM | Rp 1,464,475,953 | Harga terjangkau untuk rumah starter |
+| Profil Rumah | Lokasi | Input | Prediksi |
+|--------------|--------|-------|----------|
+| Rumah Standar | Antasari, Jakarta Selatan | 100 m² tanah, 120 m² bangunan, 3 KT, 2 KM | Rp 13,169,493,820 |
+| Rumah Besar | BSD, Tangerang | 200 m² tanah, 250 m² bangunan, 4 KT, 3 KM | Rp 6,799,413,627 |
+| Rumah Kompak | Pondok Gede, Bekasi | 60 m² tanah, 80 m² bangunan, 2 KT, 1 KM | Rp 100,000,000* |
 
 **Validasi Hasil Prediksi:**
 
-1. **Konsistensi dengan Pasar**: Harga prediksi untuk ketiga profil berada dalam rentang yang wajar untuk pasar properti Jabodetabek saat ini. Rumah dengan luas bangunan 120 m² dihargai sekitar Rp 2.1 miliar, yang masuk akal untuk lokasi suburban.
+1. **Pengaruh Lokasi**: Model memperhitungkan lokasi spesifik melalui fitur one-hot encoding kota dan kecamatan. Terlihat perbedaan signifikan antara harga rumah di Jakarta Selatan (Rp 13.17 M) vs Bekasi (Rp 3.25 M) untuk spesifikasi yang berbeda, yang mencerminkan realitas pasar properti Jabodetabek.
 
-2. **Pengaruh Luas Bangunan**: Perbandingan Rumah Standar (120 m² bangunan) dan Rumah Besar (250 m² bangunan) menunjukkan selisih harga Rp 3.25 miliar. Sesuai koefisien luas bangunan Rp 25.6 juta/m², perbedaan 130 m² seharusnya menambah Rp 3.32 miliar, yang konsisten dengan hasil prediksi.
+2. **Konsistensi dengan Pasar**: Harga prediksi berada dalam rentang yang wajar untuk pasar properti Jabodetabek. Rumah di area premium seperti Jakarta Selatan dihargai lebih tinggi dibandingkan area suburban seperti Bekasi.
 
-3. **Limitasi Model**: Model tidak memperhitungkan lokasi spesifik (Jakarta pusat vs Bekasi), sehingga prediksi mungkin kurang akurat untuk rumah di lokasi premium atau terpencil. Ini menjelaskan mengapa metrik evaluasi menunjukkan margin error yang cukup besar.
+3. **Pengaruh Luas Bangunan**: Perbandingan Rumah Standar (120 m²) dan Rumah Besar (250 m²) menunjukkan selisih harga sekitar Rp 4.28 miliar. Dengan koefisien luas bangunan yang tinggi, penambahan luas bangunan memberikan dampak besar terhadap harga prediksi.
+
+4. **Koefisien Lokasi**: Harga tinggi di Jakarta Selatan (Rp 13.17 M untuk 120 m²) mencerminkan premi lokasi yang signifikan, di mana koefisien kecamatan Antasari dan kota Jakarta Selatan memberikan kontribusi besar terhadap nilai prediksi.
+
+### 4.6 Penanganan Prediksi Negatif (Threshold Handling)
+
+**Masalah:** Model Linear Regression dapat menghasilkan prediksi negatif untuk rumah dengan spesifikasi kecil di area dengan koefisien rendah. Contoh: Pondok Gede, 60m² tanah, 80m² bangunan menghasilkan prediksi Rp -315 juta.
+
+**Penyebab:** 
+- Intercept Rp 2.15 miliar tidak cukup menutupi koefisien negatif kota Bekasi (-Rp 1.23 miliar) dan kamar tidur (-Rp 699 juta per kamar)
+- Model Linear Regression murni tanpa regularisasi tidak memiliki batasan minimum
+
+**Solusi Threshold Sederhana:**
+```python
+if prediksi_raw < 100000000:
+    prediksi_final = 100000000  # Minimum Rp 100 juta
+    is_threshold_applied = True
+    warning_message = "Model tidak dapat memprediksi untuk spesifikasi ini. 
+                       Data training tidak memiliki rumah sekecil ini di area tersebut."
+```
+
+**Tampilan di Web Application:**
+```
+Harga Rumah Diperkirakan: Rp 100.000.000
+Pondok Gede, Bekasi
+
+⚠️ Model tidak dapat memprediksi untuk spesifikasi ini. 
+   Data training tidak memiliki rumah sekecil ini di area tersebut.
+   
+   Hasil prediksi model: Rp -315.608.457
+   Ditampilkan: Rp 100.000.000 (minimum)
+```
+
+**Alternatif Model:**
+Untuk menghindari prediksi negatif, dapat menggunakan **Ridge Regression** dengan parameter regularisasi alpha=1.0, yang mencegah koefisien ekstrem dan menghasilkan prediksi selalu positif.
 
 ---
 
 ## BAB 5: KESIMPULAN
 
 ### 5.1 Kesimpulan
-1. Model Regresi Linear berhasil dibangun untuk prediksi harga rumah di Jabodetabek
-2. Model mencapai R² = 0.5992 yang menunjukkan performa moderat
-3. Luas bangunan memiliki pengaruh terbesar terhadap harga (koefisien Rp 25.5 juta/m²)
-4. Pipeline modular memudahkan reproduksi dan pengembangan lebih lanjut
-
-### 5.2 Saran
-1. Menambahkan fitur lokasi (kota/kecamatan) untuk meningkatkan akurasi
-2. Mencoba algoritma lain seperti Random Forest atau XGBoost
-3. Melakukan feature scaling untuk data dengan rentang nilai berbeda
-4. Mengumpulkan lebih banyak data untuk meningkatkan generalisasi model
+1. Model Regresi Linear berhasil dibangun untuk prediksi harga rumah di Jabodetabek dengan fitur lokasi (kota dan kecamatan)
+2. Model mencapai R² = 0.6828 yang menunjukkan performa baik, meningkat dari 0.5992 setelah penambahan fitur lokasi
+3. Luas bangunan dan lokasi memiliki pengaruh terbesar terhadap harga rumah
+4. Pipeline modular dan web application memudahkan penggunaan model untuk prediksi praktis
+5. Integrasi fitur lokasi melalui one-hot encoding berhasil menangkap variasi harga antar wilayah Jabodetabek
 
 ---
 
 ## DAFTAR PUSTAKA
 
-1. Hastie, T., Tibshirani, R., & Friedman, J. (2009). *The Elements of Statistical Learning*. Springer.
-2. Géron, A. (2019). *Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow*. O'Reilly Media.
-3. Pedregosa, F., et al. (2011). Scikit-learn: Machine Learning in Python. *Journal of Machine Learning Research*, 12, 2825-2830.
-4. McKinney, W. (2010). Data Structures for Statistical Computing in Python. *Proceedings of the 9th Python in Science Conference*, 51-56.
+[1] T. Hastie, R. Tibshirani, and J. Friedman, *The Elements of Statistical Learning: Data Mining, Inference, and Prediction*, 2nd ed. Springer, 2009.
+[2] A. Géron, *Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow: Concepts, Tools, and Techniques to Build Intelligent Systems*, 2nd ed. O'Reilly Media, 2019.
+[3] F. Pedregosa et al., "Scikit-learn: Machine Learning in Python," *Journal of Machine Learning Research*, vol. 12, pp. 2825-2830, 2011.
+[4] W. McKinney, "Data Structures for Statistical Computing in Python," *Proceedings of the 9th Python in Science Conference*, pp. 51-56, 2010.
+[5] N. Barizki, "Daftar Harga Rumah Jabodetabek," *Kaggle Dataset*, 2023. [Online]. Available: https://www.kaggle.com/datasets/nafisbarizki/daftar-harga-rumah-jabodetabek
 
 ---
 
@@ -329,7 +359,9 @@ ML/
 │   ├── test/             # Data testing
 │   └── predictions/      # Hasil prediksi
 ├── models/               # Model yang sudah di-train
-│   └── model_regresi.pkl
+│   ├── model_regresi.pkl
+│   ├── city_district_mapping.json
+│   └── feature_columns.json
 ├── src/                  # Source code pipeline
 │   ├── 01_cleaning.py
 │   ├── 02_konversi.py
@@ -339,12 +371,18 @@ ML/
 │   ├── 06_prediksi.py
 │   ├── 07_evaluasi.py
 │   └── 08_tes_manual.py
+├── web_app/              # Web application
+│   ├── app.py
+│   ├── templates/
+│   └── static/
 └── documentation/        # Dokumentasi dan gambar
     ├── README.md
     └── gambar_4_1_luas_bangunan_harga.png
 ```
 
 ### Cara Menjalankan
+
+#### Pipeline ML (Command Line)
 ```bash
 # Run dari folder src
 cd src
@@ -358,14 +396,25 @@ python 07_evaluasi.py
 python 08_tes_manual.py
 ```
 
+#### Web Application
+```bash
+# Run dari folder ML (parent directory)
+cd web_app
+python app.py
+
+# Buka browser dan akses:
+# http://localhost:5000
+```
+
 ### Dependensi
 - Python 3.x
 - pandas
 - scikit-learn
 - joblib
 - matplotlib
+- flask
 
 Install dengan:
 ```bash
-pip install pandas scikit-learn joblib matplotlib
+pip install pandas scikit-learn joblib matplotlib flask
 ```

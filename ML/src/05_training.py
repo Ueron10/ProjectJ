@@ -8,9 +8,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 X_train = pd.read_csv(os.path.join(BASE_DIR, 'data', 'train', 'X_train.csv'))
 y_train = pd.read_csv(os.path.join(BASE_DIR, 'data', 'train', 'y_train.csv'))
 
+# Use Linear Regression for prediction
 model = LinearRegression()
 model.fit(X_train, y_train)
 
 joblib.dump(model, os.path.join(BASE_DIR, 'models', 'model_regresi.pkl'))
 
-print(f"Model trained: {X_train.shape[0]} samples, R2 will be calculated in evaluation")
+print(f"Model trained: {X_train.shape[0]} samples, {X_train.shape[1]} features")
+print("Using Linear Regression")
