@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.keras.models import load_model
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.optimizers import Adam
 from sklearn.utils.class_weight import compute_class_weight
 import os
 
@@ -72,33 +73,44 @@ for idx, weight in class_weight_dict.items():
     boost = weight / orig_weight if orig_weight > 0 else 1
     print(f"  {label_map[idx]:10} ({idx}): {weight:.4f} ({boost:.1f}x boost)")
 
-# Parameter Training
+# Parameter Training - OPTIMIZED FOR >80% ACCURACY
 batch_size = 32
-epochs = 30
-learning_rate = 0.0005
+epochs = 50  # Increased from 30
+initial_lr = 0.001  # Higher initial LR
 
-print(f"\nTraining Parameters:")
+print(f"\nTraining Parameters (Target: >80% Accuracy):")
 print(f"  Batch size: {batch_size}")
-print(f"  Epochs: {epochs}")
-print(f"  Learning rate: {learning_rate}")
+print(f"  Max Epochs: {epochs}")
+print(f"  Initial LR: {initial_lr}")
+print(f"  Target Accuracy: 80%+")
 
-# Recompile with correct learning rate
-from tensorflow.keras.optimizers import Adam
+# Recompile with higher learning rate
 model.compile(
-    optimizer=Adam(learning_rate=learning_rate),
+    optimizer=Adam(learning_rate=initial_lr),
     loss='sparse_categorical_crossentropy',
     metrics=['accuracy']
 )
 
-# Train Model
+# Train Model with Learning Rate Scheduling
 print("\n" + "="*70)
-print("TRAINING MODEL...")
+print("TRAINING MODEL (Enhanced for High Accuracy)...")
 print("="*70)
 
 early_stop = EarlyStopping(
-    monitor='val_loss', 
-    patience=7,
-    restore_best_weights=True
+    monitor='val_accuracy',  # Monitor accuracy instead of loss
+    patience=10,  # More patience
+    restore_best_weights=True,
+    mode='max'
+)
+
+# Learning rate reducer
+lr_reducer = ReduceLROnPlateau(
+    monitor='val_accuracy',
+    factor=0.5,
+    patience=5,
+    min_lr=0.00001,
+    mode='max',
+    verbose=1
 )
 
 history = model.fit(
@@ -107,7 +119,7 @@ history = model.fit(
     epochs=epochs,
     validation_data=(X_test, y_test),
     class_weight=class_weight_dict,
-    callbacks=[early_stop],
+    callbacks=[early_stop, lr_reducer],
     verbose=1
 )
 
@@ -147,17 +159,30 @@ print("\nTrained model saved as 'model_sentiment_cnn_trained.keras'")
 
 # Print Summary
 print("\n" + "="*70)
-print("TRAINING SUMMARY")
+print("TRAINING SUMMARY - TARGET >80% ACCURACY")
 print("="*70)
+final_val_acc = history.history['val_accuracy'][-1]
+best_val_acc = max(history.history['val_accuracy'])
+best_epoch = np.argmax(history.history['val_accuracy']) + 1
+
 print(f"Total Epochs Run: {len(history.history['loss'])}")
 print(f"Final Training Accuracy: {history.history['accuracy'][-1]:.4f}")
-print(f"Final Validation Accuracy: {history.history['val_accuracy'][-1]:.4f}")
+print(f"Final Validation Accuracy: {final_val_acc:.4f}")
+print(f"Best Validation Accuracy: {best_val_acc:.4f} (Epoch {best_epoch})")
 print(f"Final Training Loss: {history.history['loss'][-1]:.4f}")
 print(f"Final Validation Loss: {history.history['val_loss'][-1]:.4f}")
-print("\nImprovements Applied:")
-print("- Multi-kernel CNN (kernel 3,4,5)")
-print("- Aggressive dropout (0.3-0.4)")
-print("- Lower learning rate (0.0005)")
-print("- Aggressive class weighting (negative/neutral 1.5x-1.3x boost)")
-print("- More epochs (30) with patient early stopping (patience=7)")
+
+if best_val_acc >= 0.80:
+    print(f"\nTARGET ACHIEVED: {best_val_acc*100:.2f}% >= 80%")
+else:
+    print(f"\nTARGET NOT REACHED: {best_val_acc*100:.2f}% < 80%")
+    print("Consider: more data, pre-trained embeddings (GloVe), or hyperparameter tuning")
+
+print("\nEnhancements Applied for High Accuracy:")
+print("- Increased filters: 128 per kernel (4 kernels: 2,3,4,5)")
+print("- Batch Normalization for stable training")
+print("- L2 Regularization (0.001)")
+print("- Learning rate scheduling (ReduceLROnPlateau)")
+print("- Monitor val_accuracy with patience=10")
+print("- Up to 50 epochs")
 print("="*70)

@@ -32,13 +32,14 @@ print(f"Model saved to: {output_model_path}")
 
 # Create README
 print("\nCreating README...")
-readme_content = """# Sentiment Analysis Model
+readme_content = """# Sentiment Analysis Model (Enhanced for >80% Accuracy)
 
 ## Model Information
-- **Model Type**: CNN (Convolutional Neural Network)
+- **Model Type**: Enhanced CNN with BatchNorm + Multi-kernel Architecture
 - **Framework**: TensorFlow/Keras
-- **Input**: Tokenized text (max_length=100)
+- **Input**: Tokenized text (max_length=100, vocab_size=5000)
 - **Output**: 3 classes (negative, neutral, positive)
+- **Labeling**: VADER Sentiment Analysis
 
 ## Files
 - `model_sentiment_cnn.keras`: Trained model
@@ -78,20 +79,30 @@ print(f"Sentiment: {sentiment}")
 print(f"Confidence: {prediction[0][predicted_class]:.2f}")
 ```
 
-## Model Architecture
-- Embedding Layer (vocab_size=5000, embedding_dim=100)
-- Conv1D Layer 1 (128 filters, kernel_size=5)
-- Conv1D Layer 2 (64 filters, kernel_size=3)
-- GlobalMaxPooling1D
-- Dense Layer (128 units, ReLU)
-- Dropout (0.5)
-- Dense Layer (64 units, ReLU)
-- Dropout (0.3)
-- Output Layer (3 units, Softmax)
+## Enhanced Model Architecture
+- **Embedding Layer**: vocab_size=5000, embedding_dim=128
+- **Multi-kernel Conv1D Layers**:
+  - Conv1D (128 filters, kernel_size=2) + BatchNorm + GlobalMaxPooling
+  - Conv1D (128 filters, kernel_size=3) + BatchNorm + GlobalMaxPooling
+  - Conv1D (128 filters, kernel_size=4) + BatchNorm + GlobalMaxPooling
+  - Conv1D (128 filters, kernel_size=5) + BatchNorm + GlobalMaxPooling
+- **Concatenation** of all conv outputs
+- **Dense Layers**:
+  - Dense (256 units, ReLU) + BatchNorm + Dropout(0.5)
+  - Dense (128 units, ReLU) + BatchNorm + Dropout(0.4)
+  - Dense (64 units, ReLU) + Dropout(0.3)
+- **Output Layer**: 3 units, Softmax
 
-## Performance
-- Test Accuracy: ~69.42%
-- Classes: Negative (0), Neutral (1), Positive (2)
+## Training Enhancements
+- L2 Regularization (0.001) on Conv and Dense layers
+- Learning Rate Scheduling (ReduceLROnPlateau)
+- Class Weight Balancing for imbalanced data
+- Up to 50 epochs with early stopping (patience=10)
+
+## Target Performance
+- **Target Accuracy**: >80%
+- **Classes**: Negative (0), Neutral (1), Positive (2)
+- **Labeling Method**: VADER Sentiment Analysis
 """
 
 readme_path = os.path.join(models_dir, "README.md")

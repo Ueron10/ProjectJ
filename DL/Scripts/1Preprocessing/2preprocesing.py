@@ -64,6 +64,9 @@ def preprocess_text(text):
 # Terapkan ke kolom content
 df['clean_text'] = df['content'].apply(preprocess_text)
 
+# Hapus kolom rating karena tidak digunakan untuk labeling
+df = df.drop(columns=['rating'], errors='ignore')
+
 # Simpan hasil
 df.to_csv(os.path.join(data_dir, "imdb_reviews_clean.csv"), index=False, encoding='utf-8-sig')
 
