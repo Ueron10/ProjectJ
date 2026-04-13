@@ -1,1 +1,7 @@
-DL/Data/*.csv
+# File besar (CSV, model, numpy arrays)
+Data/*.csv
+Outputs/*.npy
+Outputs/*.pkl
+Models/*.keras
+Models/*.h5
+Models/*.pkl
