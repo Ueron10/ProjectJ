@@ -29,11 +29,21 @@ label_classes = np.load(os.path.join(outputs_dir, "label_encoding.npy"), allow_p
 
 # Preprocessing setup
 stemmer = PorterStemmer()
-stop_words = set(stopwords.words('english')) - {
-    'no', 'not', 'nor', 'don', 'don\'t', 'very', 'so', 'too', 'just', 'only'
+std_stopwords = set(stopwords.words('english'))
+sentiment_important = {
+    'no', 'not', 'nor', 'don', 'don\'t', 'doesn', 'doesn\'t', 'didn', 'didn\'t',
+    'hasn', 'hasn\'t', 'haven', 'haven\'t', 'isn', 'isn\'t', 'aren', 'aren\'t',
+    'wasn', 'wasn\'t', 'weren', 'weren\'t', 'be', 'been', 'being', 'have', 'has',
+    'had', 'does', 'did', 'will', 'would', 'could', 'ought', 'i', 'you', 'he',
+    'she', 'it', 'we', 'they', 'what', 'which', 'who', 'whom', 'very', 'so', 'too',
+    'just', 'more', 'most', 'such', 'only', 'own', 'same', 'and', 'or', 'if', 'then',
+    'because', 'as', 'is', 'are'
 }
+stop_words = std_stopwords - sentiment_important
 
 def preprocess(text):
+    if not text:
+        return ""
     text = text.lower()
     text = re.sub(r'<.*?>', '', text)
     text = re.sub(r'[^a-zA-Z\s]', '', text)
@@ -43,14 +53,18 @@ def preprocess(text):
 
 def predict(text):
     cleaned = preprocess(text)
+    if not cleaned:
+        return None
     seq = tokenizer.texts_to_sequences([cleaned])
-    padded = pad_sequences(seq, maxlen=100)
+    padded = pad_sequences(seq, maxlen=100, padding='post', truncating='post')
     probs = model.predict(padded, verbose=0)[0]
-    pred_idx = np.argmax(probs)
+    labels = [str(label).lower() for label in label_classes]
+    pred_idx = int(np.argmax(probs))
     return {
-        'label': label_classes[pred_idx],
-        'confidence': probs[pred_idx],
-        'all_probs': {label_classes[i]: probs[i] for i in range(len(label_classes))}
+        'label': labels[pred_idx],
+        'confidence': float(probs[pred_idx]),
+        'all_probs': {labels[i]: float(probs[i]) for i in range(len(labels))},
+        'cleaned': cleaned
     }
 
 # Interactive mode
@@ -66,6 +80,9 @@ while True:
         continue
     
     result = predict(text)
+    if result is None:
+        print("\n  Result: unable to predict (cleaned text is empty)\n")
+        continue
     print(f"\n  Result: {result['label'].upper()}")
     print(f"  Confidence: {result['confidence']:.2%}")
     print()

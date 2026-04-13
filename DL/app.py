@@ -38,8 +38,12 @@ stemmer = PorterStemmer()
 std_stopwords = set(stopwords.words('english'))
 sentiment_important = {
     'no', 'not', 'nor', 'don', 'don\'t', 'doesn', 'doesn\'t', 'didn', 'didn\'t',
-    'hasn', 'hasn\'t', 'haven', 'haven\'t', 'isn', 'isn\'t', 'aren', 'aren\'t', 
-    'wasn', 'wasn\'t', 'weren', 'weren\'t', 'very', 'so', 'too', 'just', 'only'
+    'hasn', 'hasn\'t', 'haven', 'haven\'t', 'isn', 'isn\'t', 'aren', 'aren\'t',
+    'wasn', 'wasn\'t', 'weren', 'weren\'t', 'be', 'been', 'being', 'have', 'has',
+    'had', 'does', 'did', 'will', 'would', 'could', 'ought', 'i', 'you', 'he',
+    'she', 'it', 'we', 'they', 'what', 'which', 'who', 'whom', 'very', 'so', 'too',
+    'just', 'more', 'most', 'such', 'only', 'own', 'same', 'and', 'or', 'if', 'then',
+    'because', 'as', 'is', 'are'
 }
 stop_words = std_stopwords - sentiment_important
 
@@ -75,25 +79,17 @@ def predict_sentiment(text):
     if not cleaned:
         return None
     seq = tokenizer.texts_to_sequences([cleaned])
-    padded = pad_sequences(seq, maxlen=100)
+    padded = pad_sequences(seq, maxlen=100, padding='post', truncating='post')
     probs = model.predict(padded, verbose=0)[0]
-    
-    # Normal label mapping: index 0 = negative, index 1 = positive
-    neg_prob = float(probs[0])  # Index 0 = negative probability
-    pos_prob = float(probs[1])  # Index 1 = positive probability
-    
-    # Determine prediction
-    if pos_prob > neg_prob:
-        pred_label = 'positive'
-        confidence = pos_prob
-    else:
-        pred_label = 'negative'
-        confidence = neg_prob
-    
+    labels = [str(label).lower() for label in label_classes]
+    probabilities = {labels[i]: float(probs[i]) for i in range(len(labels))}
+    pred_idx = int(np.argmax(probs))
+    pred_label = labels[pred_idx]
+    confidence = float(probs[pred_idx])
     return {
         'label': pred_label,
         'confidence': confidence,
-        'probabilities': {'negative': neg_prob, 'positive': pos_prob},
+        'probabilities': probabilities,
         'cleaned': cleaned
     }
 
