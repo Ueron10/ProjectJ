@@ -14,8 +14,10 @@ from nltk.stem import PorterStemmer
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 # Download NLTK resources
@@ -121,53 +123,181 @@ def scrape_imdb_selenium(url, max_reviews=None):
         reviews_data = []
         last_count = 0
         no_change_count = 0
-        max_no_change = 3
+        max_no_change = 5
+        target_count = max_reviews if max_reviews else 1000
         
-        while True:
+        # Scroll dan load more sampai dapat target atau tidak ada lagi
+        scroll_attempts = 0
+        max_scroll_attempts = 50
+        
+        while len(reviews_data) < target_count and scroll_attempts < max_scroll_attempts:
+            scroll_attempts += 1
+            
+            # Method 1: Scroll ke bawah window
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)
+            
+            # Method 2: Scroll ke semua review elements yang sudah ada
             try:
-                load_more = driver.find_element(By.XPATH, '//button[contains(text(),"Load More")]')
-                driver.execute_script("arguments[0].click();", load_more)
-                time.sleep(3)
+                review_elements = driver.find_elements(By.CSS_SELECTOR, '[data-testid="review-card"], .ipc-list-card__content')
+                if review_elements:
+                    # Scroll ke element terakhir
+                    driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", review_elements[-1])
+                    time.sleep(1)
+                    
+                    # Scroll ke beberapa element di tengah untuk trigger lazy load
+                    mid_index = len(review_elements) // 2
+                    if mid_index > 0 and mid_index < len(review_elements):
+                        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", review_elements[mid_index])
+                        time.sleep(1)
             except:
                 pass
             
+            # Method 3: Klik Load More dengan explicit wait
+            try:
+                load_more = WebDriverWait(driver, 3).until(
+                    EC.element_to_be_clickable((By.XPATH, '//button[contains(text(),"Load More")]'))
+                )
+                driver.execute_script("arguments[0].click();", load_more)
+                print("Clicked Load More button")
+                time.sleep(4)  # Wait longer after click
+            except:
+                pass
+            
+            # Method 4: Try to find and click any expandable buttons + See all
+            try:
+                buttons = driver.find_elements(By.XPATH, '//button[contains(@class, "button") or contains(@class, "btn") or contains(@class, "ipc-btn")]')
+                for btn in buttons:
+                    try:
+                        btn_text = btn.text.lower()
+                        if any(keyword in btn_text for keyword in ['load', 'more', 'expand', 'see all', 'seeall', 'view all', 'viewall']):
+                            if btn.is_displayed() and btn.is_enabled():
+                                driver.execute_script("arguments[0].click();", btn)
+                                print(f"Clicked button: {btn_text}")
+                                
+                                # Tunggu loading selesai - cek berbagai indikator
+                                loading_wait = 0
+                                max_loading_wait = 30  # Max 30 detik tunggu
+                                while loading_wait < max_loading_wait:
+                                    time.sleep(1)
+                                    loading_wait += 1
+                                    
+                                    # Cek apakah masih loading
+                                    loading_indicators = driver.find_elements(By.XPATH, 
+                                        '//div[contains(@class, "loading") or contains(@class, "spinner") or contains(@class, "progress")] | //span[contains(text(),"Loading")]')
+                                    
+                                    if not loading_indicators:
+                                        # Cek apakah content bertambah
+                                        html_check = driver.page_source
+                                        soup_check = BeautifulSoup(html_check, "html.parser")
+                                        current_reviews = soup_check.find_all('div', class_="ipc-list-card__content")
+                                        if len(current_reviews) > last_count:
+                                            print(f"Loading done. Reviews increased from {last_count} to {len(current_reviews)}")
+                                            # Extra wait 10 detik untuk pastikan semua terload
+                                            print("Waiting 10 seconds for full render...")
+                                            time.sleep(10)
+                                            break
+                                    
+                                    if loading_wait % 5 == 0:
+                                        print(f"Still waiting for loading... ({loading_wait}s)")
+                                
+                                break
+                    except Exception as e:
+                        print(f"Button click error: {str(e)[:50]}")
+                        continue
+            except Exception as e:
+                print(f"Button scan error: {str(e)[:50]}")
+            
+            # Method 5: Check for pagination / Next button
+            try:
+                next_buttons = driver.find_elements(By.XPATH, 
+                    '//a[contains(text(),"Next")] | //button[contains(text(),"Next")] | //a[@aria-label="Next"]')
+                for next_btn in next_buttons:
+                    if next_btn.is_displayed() and next_btn.is_enabled():
+                        driver.execute_script("arguments[0].click();", next_btn)
+                        print("Clicked Next page button")
+                        time.sleep(4)
+                        break
+            except:
+                pass
+            
+            # Method 6: Check total review count on page
+            try:
+                count_elements = driver.find_elements(By.XPATH, 
+                    '//span[contains(text(),"reviews") or contains(@class, "count")] | //div[contains(text(),"showing")]')
+                for elem in count_elements:
+                    print(f"Page shows: {elem.text}")
+            except:
+                pass
+            
+            # Ambil review dengan multiple selectors
             html = driver.page_source
             soup = BeautifulSoup(html, "html.parser")
+            
+            # Coba berbagai selector yang mungkin
             reviews = soup.find_all('div', class_="ipc-list-card__content")
+            if not reviews:
+                reviews = soup.find_all('div', class_="review-container")
+            if not reviews:
+                reviews = soup.find_all('div', attrs={"data-testid": "review-card"})
+            if not reviews:
+                # Selector generik untuk article/review
+                reviews = soup.find_all('article') or soup.find_all('div', class_=lambda x: x and 'review' in x.lower())
             
             current_count = len(reviews)
+            print(f"Found {current_count} review containers...")
             
-            if max_reviews and len(reviews_data) >= max_reviews:
-                break
+            # Parse reviews yang belum ada
+            new_reviews_found = 0
+            for review in reviews:
+                # Cari title dengan berbagai kemungkinan
+                title_elem = review.find('h3') or review.find('a', class_=lambda x: x and 'title' in str(x).lower())
+                title = title_elem.text.strip() if title_elem else ""
+                
+                # Cari content dengan berbagai kemungkinan  
+                content_elem = (review.find('div', class_="ipc-html-content-inner-div") or 
+                             review.find('div', class_=lambda x: x and 'content' in str(x).lower()) or
+                             review.find('span', class_=lambda x: x and 'content' in str(x).lower()) or
+                             review.find('p'))
+                content = content_elem.get_text(strip=True) if content_elem else ""
+                
+                # Cek duplicate dan filter
+                if content and len(content) > 20:  # Minimal 20 chars
+                    is_duplicate = any(r['content'] == content for r in reviews_data)
+                    if not is_duplicate:
+                        reviews_data.append({"title": title, "content": content})
+                        new_reviews_found += 1
+                        
+                        # Stop kalau sudah cukup
+                        if max_reviews and len(reviews_data) >= max_reviews:
+                            break
             
-            if current_count == last_count:
+            print(f"Added {new_reviews_found} new reviews. Total: {len(reviews_data)}")
+            
+            # Cek apakah masih ada review baru
+            if new_reviews_found == 0:
                 no_change_count += 1
                 if no_change_count >= max_no_change:
+                    print("No more new reviews found. Stopping.")
                     break
             else:
                 no_change_count = 0
-                last_count = current_count
-        
-        html = driver.page_source
-        soup = BeautifulSoup(html, "html.parser")
-        reviews = soup.find_all('div', class_="ipc-list-card__content")
-        
-        limit = max_reviews if max_reviews else len(reviews)
-        for review in reviews[:limit]:
-            title_elem = review.find('h3')
-            title = title_elem.text.strip() if title_elem else ""
             
-            content_elem = review.find('div', class_="ipc-html-content-inner-div")
-            content = content_elem.get_text(strip=True) if content_elem else ""
-            
-            if content:
-                reviews_data.append({
-                    "title": title,
-                    "content": content
-                })
+            # Extra wait untuk lazy load
+            time.sleep(1)
         
-        if driver:
-            driver.quit()
+        # Final check: ambil lagi kalau masih kurang
+        if len(reviews_data) < (max_reviews or 1):
+            html = driver.page_source
+            soup = BeautifulSoup(html, "html.parser")
+            
+            # Last resort: cari semua text yang panjang
+            all_long_texts = soup.find_all(text=lambda text: text and len(str(text)) > 100)
+            print(f"Debug: Found {len(all_long_texts)} long text elements")
+        
+        # Limit sesuai request
+        if max_reviews:
+            reviews_data = reviews_data[:max_reviews]
         
         if not reviews_data:
             return {"error": "No reviews found", "reviews": [], "count": 0}
@@ -179,6 +309,7 @@ def scrape_imdb_selenium(url, max_reviews=None):
     finally:
         if driver:
             try:
+                time.sleep(10)
                 driver.quit()
             except:
                 pass
